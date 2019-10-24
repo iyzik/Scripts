@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Version 10-11-2019
+
+# Set variables
+now=$(date)
+filenow=$(date +"%m_%d_%Y")
+file="/var/log/auto_update.log"
+
+# Print some start info
+touch $file
+echo START: $(date) -------------------------------------------------- >> $file
+echo >> $file
+
+# Run yum update
+yum -y update >> $file
+echo >> $file
+
+# Check for old kernels and clean them up
+echo Cleaning up old kernels if possible... >> $file
+package-cleanup -y --oldkernels --count=2 >> $file
+echo >> $file
+
+# Check if we need to reboot
+needs-restarting -r >> $file
+status=$?
+echo >> $file
+
+# Reboot if needed
+if [ $status -ne 0 ]; then
+        echo Warning: restart required. System going down for reboot at $(date) >> $file
+        echo >> $file
+        # Flush caches to disk and reboot
+        /usr/bin/sync
+        /sbin/shutdown -r now
+else
+        echo Note: restart not required. Exiting... >> $file
+        echo >> $file
+fi
+
+echo END: $(date) ---------------------------------------------------- >> $file
+

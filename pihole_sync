@@ -1,0 +1,71 @@
+#!/bin/bash
+
+#Get options
+if [[ $# != 1 ]] ; then
+        echo 'Invalid number of arguments!'
+        echo 'Usage: ./pihole_sync <target host>'
+        exit -1
+fi
+target=$1
+now=$(date +"%Y_%m_%d_%I_%M_%p")
+
+#Check/create archives folder
+mkdir -p /pihole_archive
+
+#Diff archived versions if they exist
+
+#Hosts
+diff /pihole_archive/hosts /etc/hosts
+new_hosts=$?
+if [[ $new_hosts != 0 ]] ; then
+        #Arhive old version, create new archive, SCP my current version to remote host, restart piholedns
+        echo Changes to hosts file detected, syncing to remote host...
+        cp /etc/hosts /pihole_archive/hosts_$now
+        cp -f /etc/hosts /pihole_archive/hosts
+        scp /etc/hosts root@$target:/etc/hosts
+        echo Restarting piholedns service...
+        /usr/local/bin/pihole restartdns
+else
+        if [[ $force_sync == 1 ]] ; then
+            echo No changes in hosts file detected, but force_sync is enabled, syncing hosts file...
+            scp /etc/hosts root@$target:/etc/hosts
+            echo Restarting piholedns service...
+            /usr/local/bin/pihole restartdns
+        else
+            echo No changes in hosts file detected, not syncing...
+        fi
+fi
+
+#Whitelist
+if [ -f /etc/pihole/whitelist.txt ] ; then
+        diff /pihole_archive/whitelist.txt /etc/pihole/whitelist.txt
+        new_whitelist=$?
+        if [[ $new_whitelist != 0 ]] ; then
+                #Archive old version, create new archive, SCP my current version to remote host
+                cp /etc/pihole/whitelist.txt /pihole_archive/whitelist_$now.txt
+                cp -f /etc/pihole/whitelist.txt /pihole_archive/whitelist.txt
+                scp /etc/pihole/whitelist.txt root@$target:/etc/pihole/whitelist.txt
+        else
+                echo No changes in whitelist.txt file found, not syncing...
+        fi
+else
+        echo Whitelist does not exist, not archiving or syncing...
+fi
+
+#Blacklist
+if [ -f /etc/pihole/blacklist.txt ] ; then
+        diff /pihole_archive/blacklist.txt /etc/pihole/blacklist.txt
+        new_blacklist=$?
+        if [[ $new_blacklist != 0 ]] ; then
+                #Archive old version, create new archive, SCP my current version to remote host
+                cp /etc/pihole/blacklist.txt /pihole_archive/blacklist_$now.txt
+                cp -f /etc/pihole/blacklist.txt /pihole_archive/blacklist.txt
+                scp /etc/pihole/blacklist.txt root@$target:/etc/pihole/blacklist.txt
+        else
+                echo No changes in blacklist.txt file found, not syncing...
+        fi
+else
+        echo Blacklist does not exist, not archiving or syncing...
+fi
+
+
